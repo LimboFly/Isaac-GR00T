@@ -28,6 +28,7 @@ from gr00t.experiment.dist_utils import get_rank
 from gr00t.model.base.model_pipeline import ModelPipeline
 from gr00t.model.gr00t_n1d7.gr00t_n1d7 import Gr00tN1d7
 from gr00t.model.gr00t_n1d7.processing_gr00t_n1d7 import Gr00tN1d7Processor
+from gr00t.model.modelscope import resolve_model_path
 from gr00t.model.registry import register_model
 
 
@@ -79,8 +80,9 @@ class Gr00tN1d7Pipeline(ModelPipeline):
         """Setup model with proper vocabulary expansion."""
         skip_weight_loading = getattr(self.config.training, "skip_weight_loading", False)
         if self.config.training.start_from_checkpoint is not None and not skip_weight_loading:
+            checkpoint_path = resolve_model_path(self.config.training.start_from_checkpoint)
             model, loading_info = AutoModel.from_pretrained(
-                self.config.training.start_from_checkpoint,
+                checkpoint_path,
                 tune_llm=self.config.model.tune_llm,
                 tune_visual=self.config.model.tune_visual,
                 tune_projector=self.config.model.tune_projector,

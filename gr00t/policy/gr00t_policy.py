@@ -30,6 +30,7 @@ from transformers import AutoModel, AutoProcessor
 from gr00t.data.embodiment_tags import FINETUNE_ONLY_TAGS, POSTTRAIN_TAGS, EmbodimentTag
 from gr00t.data.interfaces import BaseProcessor
 from gr00t.data.types import MessageType, ModalityConfig, VLAStepData
+from gr00t.model.modelscope import resolve_model_path
 
 from .policy import BasePolicy, PolicyWrapper
 
@@ -94,7 +95,7 @@ class Gr00tPolicy(BasePolicy):
         super().__init__(strict=strict)
         if isinstance(embodiment_tag, str):
             embodiment_tag = EmbodimentTag.resolve(embodiment_tag)
-        model_dir = Path(model_path)
+        model_dir = Path(resolve_model_path(model_path))
 
         # Load the pretrained model and move to target device with bfloat16 precision
         model = AutoModel.from_pretrained(model_dir)

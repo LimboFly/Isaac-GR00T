@@ -18,6 +18,8 @@ import logging
 import torch
 from transformers.feature_extraction_utils import BatchFeature
 
+from gr00t.model.modelscope import resolve_model_path
+
 
 logger = logging.getLogger(__name__)
 
@@ -77,8 +79,9 @@ class Qwen3Backbone(torch.nn.Module):
         if load_bf16:
             extra_kwargs["torch_dtype"] = torch.bfloat16
 
+        resolved_model_name = resolve_model_path(model_name)
         self.model = Qwen3VLForConditionalGeneration.from_pretrained(
-            model_name,
+            resolved_model_name,
             **extra_kwargs,
             **transformers_loading_kwargs,
         ).eval()

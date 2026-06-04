@@ -37,6 +37,7 @@ from gr00t.data.embodiment_tags import EmbodimentTag
 from gr00t.data.interfaces import BaseProcessor
 from gr00t.data.state_action.state_action_processor import StateActionProcessor
 from gr00t.data.utils import parse_modality_configs, to_json_serializable
+from gr00t.model.modelscope import resolve_model_path
 
 from .image_augmentations import (
     apply_with_replay,
@@ -84,7 +85,9 @@ def build_processor(model_name: str, transformers_loading_kwargs: dict) -> Qwen3
             "Qwen3VLProcessor is not available. "
             "Please upgrade transformers: pip install transformers>=4.52.0"
         )
-    return Qwen3VLProcessor.from_pretrained(model_name, **transformers_loading_kwargs)
+    return Qwen3VLProcessor.from_pretrained(
+        resolve_model_path(model_name), **transformers_loading_kwargs
+    )
 
 
 class Gr00tN1d7DataCollator:
@@ -738,6 +741,7 @@ class Gr00tN1d7Processor(BaseProcessor):
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path: str | Path, **kwargs):
+        pretrained_model_name_or_path = resolve_model_path(pretrained_model_name_or_path)
         transformers_loading_kwargs = kwargs.pop(
             "transformers_loading_kwargs", {"trust_remote_code": True}
         )
