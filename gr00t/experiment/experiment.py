@@ -117,6 +117,19 @@ def run(config: Config):
     warn_configs(config)
 
     """Main training function."""
+    if (
+        config.training.num_gpus == 1
+        and "WORLD_SIZE" not in os.environ
+        and torch.cuda.is_available()
+        and torch.cuda.device_count() > 1
+        and "CUDA_VISIBLE_DEVICES" not in os.environ
+    ):
+        raise RuntimeError(
+            "Multiple CUDA devices are visible, but --num-gpus is 1 and this launch is not "
+            "distributed. Set CUDA_VISIBLE_DEVICES before launch, for example: "
+            "CUDA_VISIBLE_DEVICES=0 NUM_GPUS=1 uv run python ..."
+        )
+
     # If using distributed training, initialize the process group
     if dist.is_initialized():
         global_rank = dist.get_rank()
