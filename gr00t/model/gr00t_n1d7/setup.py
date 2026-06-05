@@ -71,6 +71,15 @@ class Gr00tN1d7Pipeline(ModelPipeline):
     def model_config(self):
         return self.config.model
 
+    def _get_start_checkpoint_path(self) -> str | None:
+        if self.config.training.start_from_checkpoint is None:
+            return None
+        if not hasattr(self, "_start_checkpoint_path"):
+            self._start_checkpoint_path = resolve_model_path(
+                self.config.training.start_from_checkpoint
+            )
+        return self._start_checkpoint_path
+
     def setup(self):
         self.model = self._create_model()
         self.train_dataset, self.eval_dataset = self._create_dataset(self.save_cfg_dir)
@@ -80,7 +89,7 @@ class Gr00tN1d7Pipeline(ModelPipeline):
         """Setup model with proper vocabulary expansion."""
         skip_weight_loading = getattr(self.config.training, "skip_weight_loading", False)
         if self.config.training.start_from_checkpoint is not None and not skip_weight_loading:
-            checkpoint_path = resolve_model_path(self.config.training.start_from_checkpoint)
+            checkpoint_path = self._get_start_checkpoint_path()
             model, loading_info = AutoModel.from_pretrained(
                 checkpoint_path,
                 tune_llm=self.config.model.tune_llm,
@@ -153,8 +162,9 @@ class Gr00tN1d7Pipeline(ModelPipeline):
     def _create_dataset(self, save_cfg_dir: Path):
         """Create appropriate dataset based on task and mode."""
         if self.config.training.start_from_checkpoint is not None:
+            checkpoint_path = self._get_start_checkpoint_path()
             processor = AutoProcessor.from_pretrained(
-                self.config.training.start_from_checkpoint,
+                checkpoint_path,
                 # Overrides
                 modality_configs=self.config.data.modality_configs,
                 use_percentiles=self.model_config.use_percentiles,
