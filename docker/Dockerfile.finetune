@@ -1,0 +1,107 @@
+# syntax=docker/dockerfile:1
+# dGPU fine-tuning environment image for Isaac GR00T N1.7.
+# Source code is intentionally not baked into this image. Mount code/model/output
+# paths at runtime, then run training from the mounted code directory.
+#
+# Build:
+#   DOCKER_BUILDKIT=1 docker build --network host -f docker/Dockerfile.finetune -t gr00t-finetune .
+#
+# Trial run:
+#   bash docker/run_finetune_trial.sh
+
+FROM nvidia/cuda:12.8.0-devel-ubuntu22.04
+
+SHELL ["/bin/bash", "-c"]
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    NVIDIA_DRIVER_CAPABILITIES=graphics,utility,compute \
+    PYTHON=/usr/bin/python \
+    CUDA_HOME=/usr/local/cuda \
+    PATH=/usr/local/cuda/bin:${PATH} \
+    LD_LIBRARY_PATH=/usr/local/cuda/lib64:${LD_LIBRARY_PATH} \
+    HF_HOME=/root/.cache/huggingface \
+    MODELSCOPE_CACHE=/root/.cache/modelscope \
+    TRITON_CACHE_DIR=/tmp/triton \
+    WANDB_MODE=disabled \
+    NO_ALBUMENTATIONS_UPDATE=1 \
+    PYTHONUNBUFFERED=1
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked <<'EOF'
+set -euo pipefail
+
+APT_RETRY_OPTS=(
+    -o Acquire::Retries=5
+    -o Acquire::http::Timeout=30
+    -o Acquire::https::Timeout=30
+)
+
+find /etc/apt -type f \( -name '*.list' -o -name '*.sources' \) -exec sed -i \
+    -e 's|http://archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' \
+    -e 's|http://security.ubuntu.com/ubuntu|https://security.ubuntu.com/ubuntu|g' \
+    {} +
+
+apt-get "${APT_RETRY_OPTS[@]}" update -o APT::Update::Error-Mode=any
+apt-get "${APT_RETRY_OPTS[@]}" install -y --no-install-recommends \
+    build-essential \
+    ca-certificates \
+    curl \
+    ffmpeg \
+    git \
+    git-lfs \
+    libegl1 \
+    python-is-python3 \
+    python3-pip \
+    python3.10 \
+    python3.10-dev \
+    python3.10-venv \
+    wget
+
+python -m pip install --upgrade --retries 5 pip setuptools wheel
+curl --retry 5 --retry-delay 10 --retry-max-time 300 -LsSf https://astral.sh/uv/0.8.14/install.sh \
+    | env UV_INSTALL_DIR=/usr/local/bin sh
+EOF
+
+WORKDIR /opt/gr00t-env
+
+# Install Python dependencies into an environment outside /workspace so mounted
+# source code never hides the virtualenv.
+COPY pyproject.toml uv.lock ./
+COPY scripts/deployment/dgpu/wheels/ ./scripts/deployment/dgpu/wheels/
+
+RUN --mount=type=cache,target=/root/.cache/uv <<'EOF'
+set -euo pipefail
+UV_PREVIEW=1 UV_HTTP_TIMEOUT=300 UV_CONCURRENT_DOWNLOADS=4 \
+    uv sync --frozen --no-install-project --extra dev
+uv pip install --python /opt/gr00t-env/.venv/bin/python modelscope
+EOF
+
+ENV PATH="/opt/gr00t-env/.venv/bin:${PATH}" \
+    VIRTUAL_ENV="/opt/gr00t-env/.venv" \
+    MUJOCO_GL=egl \
+    PYOPENGL_PLATFORM=egl \
+    __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/10_nvidia.json
+
+RUN mkdir -p /root/.cache/huggingface /root/.cache/modelscope /workspace /outputs /tmp/triton && \
+    chmod 1777 /workspace /outputs /tmp/triton
+
+RUN mkdir -p /usr/share/glvnd/egl_vendor.d /usr/share/vulkan/icd.d && \
+    printf '%s\n' \
+    '{' \
+    '    "file_format_version" : "1.0.0",' \
+    '    "ICD" : {' \
+    '        "library_path" : "libEGL_nvidia.so.0"' \
+    '    }' \
+    '}' > /usr/share/glvnd/egl_vendor.d/10_nvidia.json && \
+    printf '%s\n' \
+    '{' \
+    '    "file_format_version": "1.0.0",' \
+    '    "ICD": {' \
+    '        "library_path": "libGLX_nvidia.so.0",' \
+    '        "api_version": "1.2.140"' \
+    '    }' \
+    '}' > /usr/share/vulkan/icd.d/nvidia_icd.json
+
+WORKDIR /workspace
+
+CMD ["/bin/bash"]

@@ -59,9 +59,12 @@ def proc_config():
         return json.load(f)["processor_kwargs"]
 
 
-def test_from_pretrained_passes_hub_kwargs_to_cached_file(tmp_path):
+def test_from_pretrained_passes_hub_kwargs_to_cached_file(tmp_path, monkeypatch):
     """Repo-id processor loads must honor the HF local/cache kwargs from conftest."""
     from gr00t.model.gr00t_n1d7 import processing_gr00t_n1d7 as processor_module
+
+    monkeypatch.setenv("GROOT_MODEL_SOURCE", "huggingface")
+    monkeypatch.setenv("GROOT_LOCAL_MODEL_DIR", str(tmp_path / "model"))
 
     mock_vlm = MagicMock()
     mock_vlm.apply_chat_template.return_value = "mock text"

@@ -1,8 +1,9 @@
 export NUM_GPUS=4
+export GROOT_MODEL_SOURCE=modelscope
 uv run python \
     gr00t/experiment/launch_finetune.py \
     --base-model-path nvidia/GR00T-N1.7-3B \
-    --dataset-path data/pnp_wulong_cleaned \
+    --dataset-path data/pnp_wulong_cleaned_v2 \
     --embodiment-tag UNITREE_G1_SONIC \
     --modality-config-path gr00t/configs/data/embodiment_configs.py \
     --num-gpus $NUM_GPUS \

@@ -2,6 +2,7 @@
 # Used when building Orin/Thor/Spark images with the repo root as build context.
 checkpoints/
 demo_data/
+model/
 *.safetensors
 *.bin
 *.onnx
@@ -15,6 +16,8 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 logs/
+output/
+outputs/
 dist/
 gr00t_n1d7_onnx/
 gr00t_n1d7_engines/
